@@ -1,69 +1,116 @@
+let chart;
+let xValues = [];
+let yValues = [];
+let gattCharacteristic;
+
 Init();
 
 function Init()
 {
-	let buttonElement = document.querySelector("#connect_button");
-	buttonElement.addEventListener('click', function(event) {
-		ConnectToDevice();
-});
+	const ctx = document.getElementById('ecg_chart').getContext('2d');
+    const data = {
+        labels: xValues,
+    datasets: [{
+        label: 'ECG 01',
+        data: yValues,
+        borderColor: 'rgb(75, 192, 192)',
+		cubicInterpolationMode: 'monotone',
+    }]
+    };
+    const config = {
+        type: 'line',
+        data: data
+      };
+    chart = new Chart(ctx, config);
+    chart.options.animation = false;
+    chart.options.animations.colors = false;
+    chart.options.transitions.active.animation.duration = 0;   
 }
 
-function ConnectToDevice()
+function Connect()
 {
 
-navigator.bluetooth.requestDevice({
-  filters: [{
-    services: [0xFFE0]
-  }]
-})
-.then(device => {
-	console.log("Connecting to gatt server");
-	let gattServer = device.gatt.connect();
-	console.log("Connected to gatt server");
-	
-	return gattServer;
-})
-.then(server => {
-  console.log("Retrieving primary service 0xFFE0");
-  return server.getPrimaryService(0xFFE0);
-})
-.then(service => {
-  console.log("Retrieving characteristic 0xFFE1");
-  return service.getCharacteristic(0xFFE1);
-})
-.then(characteristic => {	  
-	  characteristic.startNotifications().then(_ => {
-      console.log('Subscribed characteristicvaluechanged');
-      characteristic.addEventListener('characteristicvaluechanged',
-          handleValueReceived);
-    });
-})
-.catch(error => { 
-alert("Error occured");
-console.log(error); 
-});
-}
-
-function LogValue(value)
-{
-	const decoder = new TextDecoder('utf-8');
-	console.log(`Decoded: ${decoder.decode(value)}`);
-	
-	for(let i = 0; i < value.byteLength; i++)
-	{
-		let currentValue = value.getUint8(i);
-		console.log(currentValue);
-		console.log(`Characteristic value is ${currentValue}`);
-	}
+	navigator.bluetooth.requestDevice({
+	  filters: [{
+		services: [0xFFE0]
+	  }]
+	})
+	.then(device => {
+		console.log("Connecting to gatt server");
+		let gattServer = device.gatt.connect();
+		console.log("Connected to gatt server");
+		
+		return gattServer;
+	})
+	.then(server => {
+	  console.log("Retrieving primary service 0xFFE0");
+	  return server.getPrimaryService(0xFFE0);
+	})
+	.then(service => {
+	  console.log("Retrieving characteristic 0xFFE1");
+	  return service.getCharacteristic(0xFFE1);
+	})
+	.then(characteristic => {
+		gattCharacteristic = characteristic;
+		characteristic.startNotifications().then(_ => {
+		  console.log('Subscribed characteristicvaluechanged');
+		  characteristic.addEventListener('characteristicvaluechanged',
+		  handleValueReceived);
+		});
+	})
+	.catch(error => { 
+	alert("Error occured");
+	console.log(error); 
+	});
 }
 
 function handleValueReceived(event) {
   const value = event.target.value;
-  let a = [];
-  for (let i = 0; i < value.byteLength; i++) {
-    a.push('0x' + ('00' + value.getUint8(i).toString(16)).slice(-2));
+  //const decoder = new TextDecoder('utf-8');
+  //const decodedValue = decoder.decode(value);  
+  console.log(value.byteLength);
+  //const yValue = Number(decodedValue);  
+  for(let i = 0; i < value.byteLength; i+= 4)
+  { 
+	const yValue = value.getUint32(i); 
+	const xValue = (new Date()).getMilliseconds();
+	xValues.push(xValue);
+    yValues.push(yValue);
+
+    if(xValues.length > 100)
+    {
+        xValues.shift();
+        yValues.shift();
+    }
   }
-  console.log('> ' + a.join(' '));
-  
-  LogValue(value);
+  //const yValue = value.getUint32(0); 
+  //console.log("X: " + xValue + " Y: " + yValue);
+  //UpdateChart(xValue, yValue);
+
+    chart.update();
+}
+
+
+function Disconnect()
+{
+	if(!gattCharacteristic)
+	{
+		return;
+	}
+	
+    gattCharacteristic.removeEventListener('characteristicvaluechanged', handleValueReceived);
+}
+
+function UpdateChart(nextX, nextY)
+{
+    xValues.push(nextX);
+    yValues.push(nextY);
+
+    if(xValues.length > 100)
+    {
+        xValues.shift();
+        yValues.shift();
+    }
+
+    chart.update();
 }

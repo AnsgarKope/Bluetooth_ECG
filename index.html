@@ -1,14 +1,21 @@
 <!DOCTYPE html>
 <html>
-<title>Lars Bluetooth</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="css/w3.css">
-<body class="perfect-center" width="100%" height="100%">
-
-<div class="perfect-center">
-  <button id="connect_button" class="w3-btn w3-blue">Connect</button>
-</div>
-
-<script src="js/main.js"></script>
-</body>
-</html> 
+	<head>
+	    <title>ECG</title>
+	    <meta name="viewport" content="width=device-width, initial-scale=1">
+		<meta charset="utf-8"/>
+	    <link rel="stylesheet" href="css/w3.css">
+		<link rel="stylesheet" href="css/main.css">
+		<script src="js/chart.min.js"></script>
+	</head>
+	<body class="fill-area">
+		<div class="action-bar w3-margin">
+			<button class="w3-btn w3-blue w3-round" onclick="Connect()">Connect</button>
+			<button class="w3-btn w3-blue w3-round" onclick="Disconnect()">Disconnect</button>
+		</div>
+		<div class="fill-area">
+			<canvas class="fill-area" id="ecg_chart"></svg>
+		</div>		
+		<script src="js/main.js"></script>
+	</body>
+</html>
