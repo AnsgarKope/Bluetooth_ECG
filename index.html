@@ -1,21 +1,149 @@
 <!DOCTYPE html>
+
 <html>
 	<head>
-	    <title>ECG</title>
-	    <meta name="viewport" content="width=device-width, initial-scale=1">
-		<meta charset="utf-8"/>
-	    <link rel="stylesheet" href="css/w3.css">
+		<title>EKG-Platine</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" href="css/w3.css">
 		<link rel="stylesheet" href="css/main.css">
 		<script src="js/chart.min.js"></script>
+		<meta charset="utf-8"/>
 	</head>
-	<body class="fill-area">
-		<div class="action-bar w3-margin">
+	<body>
+		<div class="action-bar w3-margin"> 
 			<button class="w3-btn w3-blue w3-round" onclick="Connect()">Connect</button>
 			<button class="w3-btn w3-blue w3-round" onclick="Disconnect()">Disconnect</button>
-		</div>
-		<div class="fill-area">
-			<canvas class="fill-area" id="ecg_chart"></svg>
-		</div>		
-		<script src="js/main.js"></script>
+		</div>	
+		<canvas class="fill-area" id="ecg_chart"></canvas>
+		<script>
+			let chart;																						//globale Variablen
+			let gattCharacteristic;
+			let xValues = [];	
+			let yValues = [];
+			
+			Init();																							//Funktion Init wird aufgerufen
+			
+			function Init()
+			{
+				const ctx = document.getElementById('ecg_chart').getContext('2d'); 							//Ermitteln der zeichenfläche mit der id "ecg_chart" s. z.17
+				const chart_data = 
+				{
+					labels: xValues,																		//Werte der X-Achse angegeben
+					datasets: 
+					[
+						{	
+							label: 'ECG 01',
+							data: yValues,																	//Werte der Y-Achse
+							borderColor: 'rgb(75, 192, 192)',
+							cubicInterpolationMode: 'monotone',
+						}
+					]
+				};
+				
+				const config = 
+				{
+					type: 'line',																			//ist ein Liniendiagramm
+					data: chart_data																		//weißt data, chartdata zu
+				};
+				
+				chart = new Chart(ctx, config);
+				chart.options.animation = false;
+				chart.options.animations.colors = false;
+				chart.options.transitions.active.animation.duration = 0; 
+			}
+				
+			function Connect()
+			{
+				navigator.bluetooth.requestDevice
+				(
+					{
+						filters: 
+						[
+							{
+								services: [0xFFE0]
+							}
+						]
+					}
+				)
+				.then
+				(device => 
+					{
+						console.log("Connecting to gatt server");
+						let gattServer = device.gatt.connect();
+						console.log("Connected to gatt server");
+						
+						return gattServer;
+					}
+				)				
+				.then
+				(server => 
+					{
+						console.log("Retrieving primary service 0xFFE0");
+						return server.getPrimaryService(0xFFE0);
+					}
+				)
+				.then
+				(service => 
+					{
+						console.log("Retrieving characteristic 0xFFE1");
+						return service.getCharacteristic(0xFFE1);
+					}
+				)
+				.then(characteristic => 
+					{
+						gattCharacteristic = characteristic;
+						characteristic.startNotifications().then
+						(_ => 
+							{
+								console.log('Subscribed characteristicvaluechanged');
+								characteristic.addEventListener('characteristicvaluechanged',
+								handleValueReceived);
+							}
+						);
+					}
+				)
+				.catch
+				(error => 
+					{ 
+						alert("Error occured");
+						console.log(error); 
+					}
+				);
+			}
+			
+			
+			function handleValueReceived(event) 
+			{
+				const value = event.target.value;
+				console.log(value.byteLength);
+				
+				for(let i = 0; i < value.byteLength; i+= 4)
+				{ 
+					const yValue = value.getUint32(i); 
+					const xValue = (new Date()).getMilliseconds();
+					xValues.push(xValue);
+					yValues.push(yValue);
+					
+					if(xValues.length > 100)
+					{
+						xValues.shift();
+						yValues.shift();
+					}
+				}
+
+				chart.update();
+			}
+			
+			
+			function Disconnect()
+			{
+				if(!gattCharacteristic)
+				{
+					return;
+				}
+				
+				gattCharacteristic.removeEventListener('characteristicvaluechanged', handleValueReceived);
+			}			
+		</script>
 	</body>
 </html>
